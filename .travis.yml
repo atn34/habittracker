@@ -5,10 +5,6 @@ language: python
 python:
   - 2.7
 
-node_js:
-  - 4
-  - 6
-
 cache:
   pip: true
   directories:
@@ -16,10 +12,12 @@ cache:
 
 install:
   - pip install -r api/requirements.txt -r api/dev-requirements.txt
+  - nvm install 6
+  - npm install
 
 script:
   - coverage run api/api_test.py
-  - npm test
+  - npm test -- --coverage
   - npm run build
 
 after_success:
