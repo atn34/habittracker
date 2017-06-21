@@ -9,8 +9,9 @@
     "react-dom": "^15.6.1"
   },
   "jest": {
-    "coverageDirectory": "./coverage/",
-    "collectCoverage": true
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ]
   },
   "devDependencies": {
     "moxios": "^0.4.0",
