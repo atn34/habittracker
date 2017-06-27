@@ -1,6 +1,5 @@
 import base64
 import binascii
-import fnmatch
 import json
 import os
 
@@ -50,7 +49,6 @@ def new_secret():
 
 class Token(db.Model):
     tokenid = db.Column(db.Integer, primary_key=True)
-    http_method_glob = db.Column(db.String(16), default="*")
     secret = db.Column(db.String(128), default=new_secret)
     userid = db.Column(db.Integer, db.ForeignKey('user.userid'))
     user = db.relationship('User', backref=db.backref('tokens', lazy='dynamic'))
@@ -75,7 +73,6 @@ class Token(db.Model):
 
 def MakeToken(user):
     token = Token(user)
-    token.http_method_glob = '*'
     token.secret = new_secret()
     return token
 
@@ -93,7 +90,7 @@ def _validate_request_made_on_behalf_of_user(auth_header, userid, http_method):
     token = Token.query.filter_by(tokenid=tokenid).first()
     if token is None:
         return False
-    return userid == token.userid and secret == token.secret and fnmatch.fnmatch(http_method, token.http_method_glob) 
+    return userid == token.userid and secret == token.secret
 
 def validate_request_made_on_behalf_of_user(auth_header, userid, http_method):
     if not _validate_request_made_on_behalf_of_user(auth_header, userid, http_method):
