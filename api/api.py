@@ -3,7 +3,7 @@ import datetime
 from flask import Flask, request
 from flask_restplus import Resource, Api, fields
 
-from models import db, User, Goal
+from models import db, User, Goal, validate_request_made_on_behalf_of_user
 
 PROD_CONFIG = {
     'SQLALCHEMY_DATABASE_URI': 'sqlite:////tmp/test.db',
@@ -63,6 +63,8 @@ class UserEndpoint(Resource):
     @api.doc(model=GetUserResponse)
     @api.marshal_with(GetUserResponse)
     def get(self, userid):
+        validate_request_made_on_behalf_of_user(
+            request.headers.get('Authorization'), userid, 'GET')
         user = User.query.filter_by(userid=userid).first_or_404()
         return user
 
@@ -71,6 +73,8 @@ class UserEndpoint(Resource):
     @api.marshal_with(PutUserResponse)
     def put(self, userid):
         # TODO do something more graceful when integrity constraints are violated.
+        validate_request_made_on_behalf_of_user(
+            request.headers.get('Authorization'), userid, 'PUT')
         user = User.query.filter_by(userid=userid).first_or_404()
         update_obj_with(user, request.json, User.write_fields.iterkeys())
         db.session.add(user)
@@ -97,6 +101,8 @@ class GoalEndpoint(Resource):
     @api.marshal_with(GetGoalResponse)
     def get(self, goalid):
         goal = Goal.query.filter_by(goalid=goalid).first_or_404()
+        validate_request_made_on_behalf_of_user(
+            request.headers.get('Authorization'), goal.userid, 'GET')
         return goal
 
     @api.expect(PutGoalRequest)
@@ -105,6 +111,8 @@ class GoalEndpoint(Resource):
     def put(self, goalid):
         # TODO do something more graceful when integrity constraints are violated.
         goal = Goal.query.filter_by(goalid=goalid).first_or_404()
+        validate_request_made_on_behalf_of_user(
+            request.headers.get('Authorization'), goal.userid, 'PUT')
         for field in Goal.write_fields:
             setattr(goal, field, request.json[field])
         db.session.add(goal)
@@ -122,9 +130,12 @@ class MarkDoneEndpoint(Resource):
     @api.doc(model=MarkDoneResponse)
     @api.marshal_with(MarkDoneResponse) 
     def post(self, goalid):
+        goal = Goal.query.filter_by(goalid=goalid).first_or_404()
+        validate_request_made_on_behalf_of_user(
+            request.headers.get('Authorization'), goal.userid, 'POST')
         now = get_now()
-        db.session.query(Goal).filter(Goal.goalid == goalid).update(
-            {'lastDone': now})
+        goal.lastDone = now
+        db.session.add(goal)
         db.session.commit()
         return {'lastDone': now, 'goalid': goalid}
 
@@ -135,6 +146,8 @@ class UserGoals(Resource):
     @api.doc(model=UserGoalsResponse)
     @api.marshal_with(UserGoalsResponse)
     def get(self, userid):
+        validate_request_made_on_behalf_of_user(
+            request.headers.get('Authorization'), userid, 'GET')
         user = User.query.filter_by(userid=userid).first_or_404()
         goals = user.goals.all()
         return {'goals': goals}
@@ -147,6 +160,8 @@ class UserGoal(Resource):
     @api.doc(model=GoalPostResponse)
     @api.marshal_with(GoalPostResponse)
     def post(self, userid):
+        validate_request_made_on_behalf_of_user(
+            request.headers.get('Authorization'), userid, 'POST')
         user = User.query.filter_by(userid=userid).first_or_404()
         goal = Goal(user=user)
         update_obj_with(goal, request.json, Goal.write_fields.iterkeys())

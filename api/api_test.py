@@ -19,6 +19,8 @@ GOAL2 = dict(name='goal 2',
              userid=1,)
 
 
+@mock.patch('models._validate_request_made_on_behalf_of_user',
+        side_effect=lambda auth_header, userid, http_method: True)
 class EndpointsTest(TestCase):
 
     def create_app(self):
@@ -43,7 +45,7 @@ class EndpointsTest(TestCase):
                 'Content-Type': 'application/json'},
             data=None if data is None else json.dumps(data))
 
-    def testPostGetPutGetUser(self):
+    def testPostGetPutGetUser(self, validate_mock):
         response = self.requestHelper(
             method='POST',
             path='/api/user',
@@ -72,7 +74,7 @@ class EndpointsTest(TestCase):
         ))
 
     @mock.patch('api.get_now', side_effect=lambda: datetime.datetime(2017, 6, 19, 17, 23, 17, 478968))
-    def testPostGetPutGetMarkdoneGetGoal(self, get_now_function):
+    def testPostGetPutGetMarkdoneGetGoal(self, get_now_function, validate_mock):
         response = self.requestHelper(
             method='POST',
             path='/api/user',
@@ -122,7 +124,7 @@ class EndpointsTest(TestCase):
             lastDone=get_now_function().isoformat(),
             userid=1,))
 
-    def testMultipleGoals(self):
+    def testMultipleGoals(self, validate_mock):
         response = self.requestHelper(
             method='POST',
             path='/api/user',
