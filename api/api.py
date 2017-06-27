@@ -39,15 +39,16 @@ PostUserResponse = api.model('PostUserResponse', User.read_fields)
 GetUserResponse = api.model('GetUserResponse', User.read_fields)
 PutUserRequest = api.model('PutUserRequest', User.write_fields)
 PutUserResponse = api.model('PutUserResponse', User.read_fields)
-TokenPostRequest = api.model('TokenPostRequest', {
+UsernameTokenPostRequest = api.model('UsernameTokenPostRequest', {
     'username': fields.String(),
     'password': fields.String(),
 })
-TokenPostResponse = api.model('TokenPostResponse', {
+UsernameTokenPostResponse = api.model('UsernameTokenPostResponse', {
     'token': fields.String(),
     'userid': fields.Integer(),
 })
-
+TokenPostRequest = api.model('TokenPostRequest', {'password': fields.String()})
+TokenPostResponse = api.model('TokenPostResponse', {'token': fields.String()})
 
 @api.route('/api/user')
 class CreateUserEndpoint(Resource):
@@ -67,9 +68,9 @@ class CreateUserEndpoint(Resource):
 @api.route('/api/maketoken')
 class MakeTokenEndpoint(Resource):
 
-    @api.expect(TokenPostRequest)
-    @api.doc(model=TokenPostResponse)
-    @api.marshal_with(TokenPostResponse)
+    @api.expect(UsernameTokenPostRequest)
+    @api.doc(model=UsernameTokenPostResponse)
+    @api.marshal_with(UsernameTokenPostResponse)
     def post(self):
         json = request.json
         user = User.query.filter_by(username=json['username']).first()
@@ -106,6 +107,22 @@ class UserEndpoint(Resource):
         db.session.commit()
         return user
 
+@api.route('/api/user/<int:userid>/maketoken')
+class UserEndpoint(Resource):
+
+    @api.expect(TokenPostRequest)
+    @api.doc(model=TokenPostResponse)
+    @api.marshal_with(TokenPostResponse)
+    def post(self, userid):
+        json = response.json
+        user = User.query.filter_by(userid=userid).first_or_404()
+        if user.password == json['password']:
+            token = MakeToken(user)
+        else:
+            abort(401)
+        db.session.add(token)
+        db.session.commit()
+        return dict(token=token.serialize())
 
 GetGoalResponse = api.model('GetGoalResponse', Goal.read_fields)
 PutGoalRequest = api.model('PutGoalRequest', Goal.write_fields)
