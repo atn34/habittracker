@@ -19,8 +19,6 @@ GOAL2 = dict(name='goal 2',
              userid=1,)
 
 
-@mock.patch('models._validate_request_made_on_behalf_of_user',
-        side_effect=lambda auth_header, userid, http_method: True)
 class EndpointsTest(TestCase):
 
     def create_app(self):
@@ -31,6 +29,7 @@ class EndpointsTest(TestCase):
         return create_app(config)
 
     def setUp(self):
+        self.token = None
         db.create_all()
 
     def tearDown(self):
@@ -38,22 +37,36 @@ class EndpointsTest(TestCase):
         db.drop_all()
 
     def requestHelper(self, path, method='GET', data=None):
+        headers = {}
+        if self.token:
+            headers['Authorization'] = 'Bearer %s' % self.token
+        if data is not None:
+            headers['Content-Type'] = 'application/json'
         return self.client.open(
             method=method,
             path=path,
-            headers=None if data is None else {
-                'Content-Type': 'application/json'},
+            headers=headers,
             data=None if data is None else json.dumps(data))
 
-    def testPostGetPutGetUser(self, validate_mock):
+    def createUser(self):
         response = self.requestHelper(
             method='POST',
             path='/api/user',
-            data=dict(username='myusername'))
+            data=dict(username='myusername', password='mypassword'))
         self.assertEquals(response.json, dict(
             userid=1,
             username='myusername',
         ))
+        response = self.requestHelper(
+            method='POST',
+            path='/api/maketoken',
+            data=dict(username='myusername', password='mypassword'),
+        )
+        self.assertIn('token', response.json)
+        self.token = response.json['token']
+
+    def testPostGetPutGetUser(self):
+        self.createUser()
         response = self.requestHelper(path='/api/user/1')
         self.assertEquals(response.json, dict(
             userid=1,
@@ -74,15 +87,8 @@ class EndpointsTest(TestCase):
         ))
 
     @mock.patch('api.get_now', side_effect=lambda: datetime.datetime(2017, 6, 19, 17, 23, 17, 478968))
-    def testPostGetPutGetMarkdoneGetGoal(self, get_now_function, validate_mock):
-        response = self.requestHelper(
-            method='POST',
-            path='/api/user',
-            data=dict(username='myusername'))
-        self.assertEquals(response.json, dict(
-            userid=1,
-            username='myusername',
-        ))
+    def testPostGetPutGetMarkdoneGetGoal(self, get_now_function):
+        self.createUser()
         response = self.requestHelper(
             method='POST',
             path='/api/user/1/goal',
@@ -124,15 +130,8 @@ class EndpointsTest(TestCase):
             lastDone=get_now_function().isoformat(),
             userid=1,))
 
-    def testMultipleGoals(self, validate_mock):
-        response = self.requestHelper(
-            method='POST',
-            path='/api/user',
-            data=dict(username='myusername'))
-        self.assertEquals(response.json, dict(
-            userid=1,
-            username='myusername',
-        ))
+    def testMultipleGoals(self):
+        self.createUser()
         response = self.requestHelper(
             method='POST',
             path='/api/user/1/goal',

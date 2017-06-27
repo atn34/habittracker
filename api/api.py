@@ -1,9 +1,9 @@
 import datetime
 
-from flask import Flask, request
+from flask import Flask, request, abort
 from flask_restplus import Resource, Api, fields
 
-from models import db, User, Goal, validate_request_made_on_behalf_of_user
+from models import db, User, Goal, Token, MakeToken, validate_request_made_on_behalf_of_user
 
 PROD_CONFIG = {
     'SQLALCHEMY_DATABASE_URI': 'sqlite:////tmp/test.db',
@@ -39,6 +39,14 @@ PostUserResponse = api.model('PostUserResponse', User.read_fields)
 GetUserResponse = api.model('GetUserResponse', User.read_fields)
 PutUserRequest = api.model('PutUserRequest', User.write_fields)
 PutUserResponse = api.model('PutUserResponse', User.read_fields)
+TokenPostRequest = api.model('TokenPostRequest', {
+    'username': fields.String(),
+    'password': fields.String(),
+})
+TokenPostResponse = api.model('TokenPostResponse', {
+    'token': fields.String(),
+    'userid': fields.Integer(),
+})
 
 
 @api.route('/api/user')
@@ -55,6 +63,23 @@ class CreateUserEndpoint(Resource):
         db.session.add(user)
         db.session.commit()
         return user
+
+@api.route('/api/maketoken')
+class MakeTokenEndpoint(Resource):
+
+    @api.expect(TokenPostRequest)
+    @api.doc(model=TokenPostResponse)
+    @api.marshal_with(TokenPostResponse)
+    def post(self):
+        json = request.json
+        user = User.query.filter_by(username=json['username']).first()
+        if user.password == json['password']:
+            token = MakeToken(user)
+        else:
+            abort(401)
+        db.session.add(token)
+        db.session.commit()
+        return dict(token=token.serialize(), userid=user.userid)
 
 
 @api.route('/api/user/<int:userid>')

@@ -1,3 +1,4 @@
+import base64
 import binascii
 import fnmatch
 import json
@@ -11,8 +12,10 @@ db = SQLAlchemy()
 class User(db.Model):
     userid = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True)
+    password = db.Column(db.String(80))
 
     write_fields = {'username': fields.String,
+                    'password': fields.String,
                     }
     read_fields = {'userid': fields.Integer,
                    'username': fields.String,
@@ -61,14 +64,25 @@ class Token(db.Model):
     def __init__(self, user):
         self.user = user
 
-
     def __repr__(self):
         return '<Token %r>' % self.tokenid
 
+    def serialize(self):
+        return base64.b64encode(json.dumps(dict(
+            tokenid=self.tokenid,
+            secret=self.secret,
+        )))
+
+def MakeToken(user):
+    token = Token(user)
+    token.http_method_glob = '*'
+    token.secret = new_secret()
+    return token
+
 def _validate_request_made_on_behalf_of_user(auth_header, userid, http_method):
     try:
-        data = json.loads(binascii.a2b_base64(auth_header.split(" ")[1]))
-    except Exception:
+        data = json.loads(base64.b64decode(auth_header.split(" ")[1]))
+    except (ValueError, TypeError):
         return False
     if not 'tokenid' in data:
         return False
@@ -76,7 +90,7 @@ def _validate_request_made_on_behalf_of_user(auth_header, userid, http_method):
         return False
     tokenid = data['tokenid']
     secret = data['secret']
-    token = Token.query.filterby(tokenid=tokenid).first()
+    token = Token.query.filter_by(tokenid=tokenid).first()
     if token is None:
         return False
     return userid == token.userid and secret == token.secret and fnmatch.fnmatch(http_method, token.http_method_glob) 
