@@ -64,6 +64,23 @@ class EndpointsTest(TestCase):
         )
         self.assertIn('token', response.json)
         self.token = response.json['token']
+    
+    def testWrongPassword(self):
+        response = self.requestHelper(
+            method='POST',
+            path='/api/user',
+            data=dict(username='myusername', password='mypassword'))
+        self.assertEquals(response.json, dict(
+            userid=1,
+            username='myusername',
+        ))
+        response = self.requestHelper(
+            method='POST',
+            path='/api/maketoken',
+            data=dict(username='myusername', password='notmypassword'),
+        )
+        self.assert401(response)
+        self.assertNotIn('token', response.json)
 
     def testPostGetPutGetUser(self):
         self.createUser()
