@@ -6,6 +6,7 @@ import unittest
 from flask import Flask
 from flask_testing import TestCase
 
+import api
 from api import create_app, db
 
 GOAL1 = dict(name='goal 1',
@@ -17,6 +18,13 @@ GOAL2 = dict(name='goal 2',
              goalid=2,
              lastDone=None,
              userid=1,)
+
+class HashTest(unittest.TestCase):
+
+    def testHash(self):
+        h = api.hash_pw('hunter2')
+        self.assertTrue(api.verify_hash('hunter2', h))
+        self.assertFalse(api.verify_hash('hunter3', h))
 
 @mock.patch('api.hash_pw', side_effect=lambda x: x)
 @mock.patch('api.verify_hash', side_effect=lambda x, y: x == y)
