@@ -18,7 +18,8 @@ GOAL2 = dict(name='goal 2',
              lastDone=None,
              userid=1,)
 
-
+@mock.patch('api.hash_pw', side_effect=lambda x: x)
+@mock.patch('api.verify_hash', side_effect=lambda x, y: x == y)
 class EndpointsTest(TestCase):
 
     def create_app(self):
@@ -65,7 +66,7 @@ class EndpointsTest(TestCase):
         self.assertIn('token', response.json)
         self.token = response.json['token']
     
-    def testWrongPassword(self):
+    def testWrongPassword(self, verify_hash, hash_pw):
         response = self.requestHelper(
             method='POST',
             path='/api/user',
@@ -82,7 +83,7 @@ class EndpointsTest(TestCase):
         self.assert401(response)
         self.assertNotIn('token', response.json)
 
-    def testPostGetPutGetUser(self):
+    def testPostGetPutGetUser(self, verify_hash, hash_pw):
         self.createUser()
         response = self.requestHelper(path='/api/user/1')
         self.assertEquals(response.json, dict(
@@ -104,7 +105,7 @@ class EndpointsTest(TestCase):
         ))
 
     @mock.patch('api.get_now', side_effect=lambda: datetime.datetime(2017, 6, 19, 17, 23, 17, 478968))
-    def testPostGetPutGetMarkdoneGetGoal(self, get_now_function):
+    def testPostGetPutGetMarkdoneGetGoal(self, get_now_function, verify_hash, hash_pw):
         self.createUser()
         response = self.requestHelper(
             method='POST',
@@ -147,7 +148,7 @@ class EndpointsTest(TestCase):
             lastDone=get_now_function().isoformat(),
             userid=1,))
 
-    def testMultipleGoals(self):
+    def testMultipleGoals(self, verify_hash, hash_pw):
         self.createUser()
         response = self.requestHelper(
             method='POST',
@@ -161,7 +162,6 @@ class EndpointsTest(TestCase):
         self.assertEquals(response.json, GOAL2)
         response = self.requestHelper(path='/api/user/1/goals')
         self.assertEquals(response.json, dict(goals=[GOAL1, GOAL2]))
-
 
 if __name__ == '__main__':
     unittest.main()

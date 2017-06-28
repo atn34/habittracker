@@ -3,6 +3,8 @@ import datetime
 from flask import Flask, request, abort
 from flask_restplus import Resource, Api, fields
 
+from passlib.hash import hex_sha512, bcrypt
+
 from models import db, User, Goal, Token, MakeToken, validate_request_made_on_behalf_of_user
 
 PROD_CONFIG = {
@@ -31,6 +33,13 @@ def update_obj_with(obj, json, keys):
         if key in json:
             setattr(obj, key, json[key])
 
+# Based on https://blogs.dropbox.com/tech/2016/09/how-dropbox-securely-stores-your-passwords/
+# TODO(atn34) add pepper
+def hash_pw(password):
+    return bcrypt.hash(hex_sha512.hash(password))
+
+def verify_hash(password, h):
+    return bcrypt.verify(hex_sha512.hash(password), h)
 
 # Endpoints
 
@@ -50,6 +59,9 @@ UsernameTokenPostResponse = api.model('UsernameTokenPostResponse', {
 TokenPostRequest = api.model('TokenPostRequest', {'password': fields.String()})
 TokenPostResponse = api.model('TokenPostResponse', {'token': fields.String()})
 
+user_update_fields = User.write_fields.keys()
+user_update_fields.remove('password')
+
 @api.route('/api/user')
 class CreateUserEndpoint(Resource):
 
@@ -60,7 +72,8 @@ class CreateUserEndpoint(Resource):
         # TODO do something more graceful when integrity constraints are violated.
         json = request.json
         user = User()
-        update_obj_with(user, json, User.write_fields.iterkeys())
+        update_obj_with(user, json, user_update_fields)
+        user.pwhash = hash_pw(json['password'])
         db.session.add(user)
         db.session.commit()
         return user
@@ -74,7 +87,7 @@ class MakeTokenEndpoint(Resource):
     def post(self):
         json = request.json
         user = User.query.filter_by(username=json['username']).first()
-        if user.password == json['password']:
+        if verify_hash(json['password'], user.pwhash):
             token = MakeToken(user)
         else:
             abort(401)
@@ -116,7 +129,7 @@ class UserEndpoint(Resource):
     def post(self, userid):
         json = response.json
         user = User.query.filter_by(userid=userid).first_or_404()
-        if user.password == json['password']:
+        if verify_hash(json['password'], user.pwhash):
             token = MakeToken(user)
         else:
             abort(401)

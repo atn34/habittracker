@@ -11,7 +11,7 @@ db = SQLAlchemy()
 class User(db.Model):
     userid = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True)
-    password = db.Column(db.String(80))
+    pwhash = db.Column(db.String(80))
 
     write_fields = {'username': fields.String,
                     'password': fields.String,
